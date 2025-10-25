@@ -4,13 +4,13 @@ import numpy as np
 import json
 import os
 from pathlib import Path
-import requests
 from typing import Dict, Any
 import logging
 import sys
 from insrenew import MLContext
+import requests
 
-# Constants
+# API Configuration
 API_URL = "http://localhost:8000"  # FastAPI server URL
 
 # Configure logging
