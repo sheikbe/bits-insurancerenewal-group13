@@ -846,8 +846,12 @@ class MLContext:
             # Convert SHAP values to numeric array, handling scientific notation
             shap_array = shap_vals if not isinstance(shap_vals, list) else shap_vals[0]
             shap_array = np.asarray(shap_array, dtype=np.float64)
+            shap_array = np.array(shap_vals[0] if isinstance(shap_vals, list) and len(shap_vals) > 0 else shap_vals, dtype=float)
+            if len(shap_array.shape) > 2: # Handle cases where SHAP returns values for multiple classes
+                shap_array = shap_array[:, :, 1] # Assuming we need class 1's SHAP values
             
             shap_df = pd.DataFrame(shap_array, columns=feat_names)
+            shap_df = pd.DataFrame(shap_array, columns=feat_names[:shap_array.shape[1]])
             out_csv = self.results_dir / f"shap_values_{model_name}.csv"
             # Save with high precision to preserve scientific notation values
             shap_df.to_csv(out_csv, index=False, float_format='%.10f')
@@ -1696,8 +1700,10 @@ class MLContext:
                     self.logger.warning("SHAP returned empty list.")
                     return None
                 shap_arr = np.asarray(shap_vals[0])
+                shap_arr = np.array(shap_vals[0], dtype=float)
             else:
                 shap_arr = np.asarray(shap_vals)
+                shap_arr = np.array(shap_vals, dtype=float)
             feat_names = getattr(self, 'numeric_features', []) + getattr(self, 'categorical_features', [])
             if not feat_names and isinstance(self.X_test, pd.DataFrame):
                 feat_names = list(self.X_test.columns)
