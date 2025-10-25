@@ -842,9 +842,15 @@ class MLContext:
             if not feat_names:
                 # fallback to columns from X_test
                 feat_names = list(self.X_test.columns)
-            shap_df = pd.DataFrame(shap_vals if not isinstance(shap_vals, list) else shap_vals[0], columns=feat_names)
+            
+            # Convert SHAP values to numeric array, handling scientific notation
+            shap_array = shap_vals if not isinstance(shap_vals, list) else shap_vals[0]
+            shap_array = np.asarray(shap_array, dtype=np.float64)
+            
+            shap_df = pd.DataFrame(shap_array, columns=feat_names)
             out_csv = self.results_dir / f"shap_values_{model_name}.csv"
-            shap_df.to_csv(out_csv, index=False)
+            # Save with high precision to preserve scientific notation values
+            shap_df.to_csv(out_csv, index=False, float_format='%.10f')
             self.logger.info("Saved SHAP values sample to %s", out_csv)
             # summary plot
             try:
