@@ -838,15 +838,18 @@ class MLContext:
             expl = shap.TreeExplainer(raw_model)
             shap_vals = expl.shap_values(Xs) if hasattr(expl, 'shap_values') else expl(Xs)
             # Save a CSV sample of shap values
-            feat_names = getattr(self, 'numeric_features', []) + getattr(self, 'categorical_features', [])
-            if not feat_names:
-                # fallback to columns from X_test
+            # Get feature names from the preprocessor if it exists
+            try:
+                feat_names = self.preprocessor.get_feature_names_out()
+            except Exception:
+                # Fallback for older sklearn or if preprocessor doesn't have the method
                 feat_names = list(self.X_test.columns)
             
             # Convert SHAP values to numeric array, handling scientific notation
-            shap_array = shap_vals if not isinstance(shap_vals, list) else shap_vals[0]
-            shap_array = np.asarray(shap_array, dtype=np.float64)
-            shap_array = np.array(shap_vals[0] if isinstance(shap_vals, list) and len(shap_vals) > 0 else shap_vals, dtype=float)
+            # For classification, shap_values can be a list of arrays (one per class)
+            shap_array = shap_vals[1] if isinstance(shap_vals, list) and len(shap_vals) > 1 else shap_vals
+            shap_array = np.array(shap_array, dtype=float)
+
             if len(shap_array.shape) > 2: # Handle cases where SHAP returns values for multiple classes
                 shap_array = shap_array[:, :, 1] # Assuming we need class 1's SHAP values
             
@@ -1699,12 +1702,12 @@ class MLContext:
                 if len(shap_vals) == 0:
                     self.logger.warning("SHAP returned empty list.")
                     return None
-                shap_arr = np.asarray(shap_vals[0])
-                shap_arr = np.array(shap_vals[0], dtype=float)
+                # For classification, shap_values is often a list of [class_0_shap, class_1_shap]
+                # We are interested in class 1 (the positive class)
+                shap_arr = np.array(shap_vals[1] if len(shap_vals) > 1 else shap_vals[0], dtype=float)
             else:
-                shap_arr = np.asarray(shap_vals)
                 shap_arr = np.array(shap_vals, dtype=float)
-            feat_names = getattr(self, 'numeric_features', []) + getattr(self, 'categorical_features', [])
+            feat_names = self.preprocessor.get_feature_names_out() if hasattr(self.preprocessor, 'get_feature_names_out') else None
             if not feat_names and isinstance(self.X_test, pd.DataFrame):
                 feat_names = list(self.X_test.columns)
             n_feats = shap_arr.shape[1]
