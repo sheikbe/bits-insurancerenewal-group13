@@ -4,18 +4,23 @@ import numpy as np
 import json
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-import uvicorn
 from typing import Optional, Dict, Any
-import joblib
 import time
 import logging
 import sys
-from fastapi.responses import JSONResponse
-import threading
 from insrenew import MLContext
+
+# Import the API endpoints from api.py
+from api import (
+    train_endpoint,
+    test_endpoint,
+    predict_endpoint,
+    BASE_DIR,
+    DATA_DIR,
+    MODELS_DIR,
+    RESULTS_DIR
+)
 
 # Configure logging
 logging.basicConfig(
