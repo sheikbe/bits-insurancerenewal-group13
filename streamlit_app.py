@@ -4,26 +4,14 @@ import numpy as np
 import json
 import os
 from pathlib import Path
-import asyncio
+import requests
 from typing import Dict, Any
 import logging
 import sys
 from insrenew import MLContext
 
-# Import from api.py
-from api import (
-    train_endpoint,
-    test_endpoint,
-    predict_endpoint,
-    BASE_DIR,
-    DATA_DIR,
-    MODELS_DIR,
-    RESULTS_DIR,
-    StatusLog,
-    TrainResponse,
-    TestResponse,
-    PredictResponse
-)
+# Constants
+API_URL = "http://localhost:8000"  # FastAPI server URL
 
 # Configure logging
 logging.basicConfig(
@@ -65,17 +53,23 @@ def main():
                     train_data = pd.read_csv(train_file)
                     # Convert DataFrame to dict for FastAPI
                     train_dict = train_data.to_dict(orient='list')
-                    result = asyncio.run(train_endpoint(train_dict))
                     
-                    if "error" in result:
-                        st.error(f"Training failed: {result['error']}")
-                    else:
-                        st.session_state["train_result"] = result
-                        if result.chosen_model:
-                            st.session_state["chosen_model"] = result.chosen_model
-                        st.success("Training completed")
-                        st.write("Status log:")
-                        st.json([log.dict() for log in result.status_log])
+                    try:
+                        response = requests.post(f"{API_URL}/train", json=train_dict)
+                        response.raise_for_status()  # Raise an exception for bad status codes
+                        result = response.json()
+                        
+                        if "error" in result:
+                            st.error(f"Training failed: {result['error']}")
+                        else:
+                            st.session_state["train_result"] = result
+                            if result.get("chosen_model"):
+                                st.session_state["chosen_model"] = result["chosen_model"]
+                            st.success("Training completed")
+                            st.write("Status log:")
+                            st.json(result["status_log"])
+                    except Exception as e:
+                        st.error(f"Training failed: {str(e)}")
 
         if st.session_state["train_result"]:
             st.subheader("Last training result")
@@ -97,20 +91,26 @@ def main():
                     test_data = pd.read_csv(test_file)
                     # Convert DataFrame to dict for FastAPI
                     test_dict = test_data.to_dict(orient='list')
-                    result = asyncio.run(test_endpoint(test_dict))
                     
-                    st.success("Test predictions created")
-                    st.write("Predictions file:", result.predictions_path)
-                    
-                    if result.preview:
-                        st.dataframe(pd.DataFrame(result.preview))
-                    
-                    st.session_state["test_df"] = test_data
-                    st.info("Test data stored for single predictions")
+                    try:
+                        response = requests.post(f"{API_URL}/test", json=test_dict)
+                        response.raise_for_status()
+                        result = response.json()
+                        
+                        st.success("Test predictions created")
+                        st.write("Predictions file:", result["predictions_path"])
+                        
+                        if result.get("preview"):
+                            st.dataframe(pd.DataFrame(result["preview"]))
+                        
+                        st.session_state["test_df"] = test_data
+                        st.info("Test data stored for single predictions")
 
-                    # Display metrics
-                    st.write("Model evaluation metrics:")
-                    st.json(result.metrics)
+                        # Display metrics
+                        st.write("Model evaluation metrics:")
+                        st.json(result["metrics"])
+                    except Exception as e:
+                        st.error(f"Testing failed: {str(e)}")
 
     # Predict Tab
     with tab3:
@@ -127,8 +127,13 @@ def main():
                     st.write("Selected row data:")
                     st.json(row)
                     
-                    result = asyncio.run(predict_endpoint(row))
-                    st.success(f"Prediction: {result.prediction} (prob={result.prob:.3f}) using model {result.model}")
+                    try:
+                        response = requests.post(f"{API_URL}/predict", json=row)
+                        response.raise_for_status()
+                        result = response.json()
+                        st.success(f"Prediction: {result['prediction']} (prob={result['prob']:.3f}) using model {result['model']}")
+                    except Exception as e:
+                        st.error(f"Prediction failed: {str(e)}")
 
         st.subheader("Or: Manually enter customer features")
         st.write("Enter feature values as JSON")
@@ -137,12 +142,14 @@ def main():
         if st.button("Predict for manual customer"):
             try:
                 cust = json.loads(cust_text)
-                result = asyncio.run(predict_endpoint(cust))
-                st.success(f"Prediction: {result.prediction} (prob={result.prob:.3f}) using model {result.model}")
+                response = requests.post(f"{API_URL}/predict", json=cust)
+                response.raise_for_status()
+                result = response.json()
+                st.success(f"Prediction: {result['prediction']} (prob={result['prob']:.3f}) using model {result['model']}")
             except json.JSONDecodeError as e:
                 st.error(f"Invalid JSON: {e}")
             except Exception as e:
-                st.error(f"Prediction failed: {e}")
+                st.error(f"Prediction failed: {str(e)}")
 
 if __name__ == "__main__":
     main()
