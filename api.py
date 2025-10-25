@@ -151,10 +151,25 @@ async def test_endpoint(test_data: Dict[str, Any]):
         ctx = MLContext(base_dir=str(BASE_DIR))
         test_results = ctx.predict_external_test(str(test_path))
         
+        # Handle NaN values in metrics and preview
+        metrics = test_results.get("metrics", {})
+        metrics_clean = {}
+        for k, v in metrics.items():
+            if isinstance(v, float) and np.isnan(v):
+                metrics_clean[k] = None
+            else:
+                metrics_clean[k] = v
+        
+        preview = test_results.get("preview", [])
+        for item in preview:
+            for k, v in item.items():
+                if isinstance(v, float) and np.isnan(v):
+                    item[k] = None
+        
         return TestResponse(
             message=test_results.get("message", ""),
-            metrics=test_results.get("metrics", {}),
-            preview=test_results.get("preview", []),
+            metrics=metrics_clean,
+            preview=preview,
             predictions_path=str(test_results.get("output_path", ""))
         )
     
